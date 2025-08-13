@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Messages • EduConnect</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<header class="header"><div class="container">
+  <strong>EduConnect</strong>
+  <div class="spacer"></div>
+  <nav class="nav">
+    <a href="dashboard.html" data-active="dashboard">Dashboard</a>
+  </nav>
+</div></header>
+<main class="container vstack">
+  <div class="card vstack">
+    <h2>Direct Messages</h2>
+    <div class="hstack">
+      <input id="peerEmail" class="input" placeholder="Enter peer's email">
+      <button id="open" class="btn">Open chat</button>
+    </div>
+    <div id="room" class="vstack" style="display:none">
+      <div id="box" class="card" style="height:300px;overflow:auto"></div>
+      <div class="hstack">
+        <input id="msg" class="input" placeholder="Type a message">
+        <button id="send" class="btn">Send</button>
+      </div>
+    </div>
+    <div class="helper">Email verification for chats can be enforced later via rules.</div>
+  </div>
+</main>
+<script type="module">
+  import { db, onUser } from "./js/auth.js";
+  import { collection, addDoc, onSnapshot, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+  import { $, qparam } from "./js/utils.js";
+  let me=null, unsub=null, roomId=null, peer=null;
+  function room(a,b){ return [a,b].sort().join("__"); }
+  function openRoom(){
+    if(!peer) return;
+    roomId = room(me.email, peer);
+    document.getElementById("room").style.display="block";
+    if(unsub) unsub();
+    unsub = onSnapshot(query(collection(db,"messages"),
+      where("room","==",roomId), orderBy("createdAt")), (snap)=>{
+        const box=$("#box"); box.innerHTML="";
+        snap.forEach(d=>{
+          const m=d.data();
+          const div=document.createElement("div"); div.className="vstack";
+          div.innerHTML = `<div><span class="badge">${m.userEmail}</span> ${m.text}</div>`;
+          box.appendChild(div);
+        });
+        box.scrollTop = box.scrollHeight;
+      });
+  }
+  onUser(u=>{ me=u; const p=qparam("to"); if(p){ document.getElementById("peerEmail").value=p; peer=p; openRoom(); } });
+  $("#open").onclick = ()=>{ peer = $("#peerEmail").value.trim(); if(peer) openRoom(); };
+  $("#send").onclick = async ()=>{
+    const text = $("#msg").value.trim(); if(!text) return;
+    await addDoc(collection(db,"messages"), { room: roomId, text, userEmail: me.email, createdAt: serverTimestamp() });
+    $("#msg").value='';
+  };
+</script>
+</body></html>

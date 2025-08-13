@@ -1,0 +1,69 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Leaderboard • EduConnect</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<header class="header"><div class="container">
+  <strong>EduConnect</strong>
+  <div class="spacer"></div>
+  <nav class="nav">
+    <a href="dashboard.html" data-active="dashboard">Dashboard</a>
+    <a href="leaderboard.html" data-active="leaderboard">Leaderboard</a>
+  </nav>
+</div></header>
+<main class="container vstack">
+  <div class="card vstack">
+    <h2>Leaderboard</h2>
+    <div class="hstack">
+      <input id="code" class="input" placeholder="Enter quiz code (or open via Dashboard link)">
+      <button id="load" class="btn">Load</button>
+    </div>
+    <table class="table" id="board"><thead><tr><th>#</th><th>Student</th><th>Score</th><th>%</th><th>Date</th><th>Details</th></tr></thead><tbody></tbody></table>
+    <div id="detail" class="card vstack"></div>
+  </div>
+</main>
+<script type="module">
+  import { db, onUser } from "./js/auth.js";
+  import { collection, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+  import { $, qparam, fmtDate } from "./js/utils.js";
+  let quiz=null, quizId=null, attempts=[];
+  async function loadByCode(code){
+    const qs = await getDocs(query(collection(db,"quizzes"), where("code","==",code)));
+    if(qs.empty){ alert("Invalid code"); return; }
+    const d=qs.docs[0]; quiz=d.data(); quizId=d.id; loadAttempts();
+  }
+  async function loadById(id){
+    const qs = await getDocs(query(collection(db,"quizzes"), where("__name__","==",id)));
+    if(qs.empty){ alert("Not found"); return; }
+    const d=qs.docs[0]; quiz=d.data(); quizId=d.id; loadAttempts();
+  }
+  async function loadAttempts(){
+    const q = await getDocs(query(collection(db,"attempts"), where("quizId","==",quizId)));
+    attempts = q.docs.map(d=>d.data()).sort((a,b)=>b.percent-a.percent);
+    const tbody = $("#board tbody"); tbody.innerHTML="";
+    attempts.forEach((a,i)=>{
+      const tr=document.createElement("tr");
+      tr.innerHTML = `<td>${i+1}</td><td>${a.userEmail}</td><td>${a.score}/${a.total}</td><td>${a.percent}%</td><td>${fmtDate(a.createdAt)}</td><td><a href="#" data-i="${i}">View</a></td>`;
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll("a").forEach(a=>a.onclick=(e)=>{ e.preventDefault(); showDetail(attempts[Number(a.dataset.i)]); });
+  }
+  function showDetail(a){
+    const d = document.getElementById("detail"); d.innerHTML = `<h3>Attempt by ${a.userEmail}</h3>`;
+    quiz.questions.forEach((q,i)=>{
+      const got = Array.isArray(a.answers[i]) ? a.answers[i].join(",") : (a.answers[i]??"");
+      const corr = Array.isArray(q.correct) ? q.correct.join(",") : (q.correct??"");
+      const ok = ( (q.type==="multiple" && got.split(",").sort().join(",")===String(corr).split(",").sort().join(",")) ||
+                   (q.type!=="multiple" && String(got).toLowerCase()===String(corr).toLowerCase()) );
+      const row = document.createElement("div"); row.className="card";
+      row.innerHTML = `<strong>Q${i+1}. ${q.q}</strong><div class="helper">Got: ${got || '(blank)'} • Correct: ${corr}</div><div class="badge" style="background:${ok?'#dcfce7':'#fee2e2'};color:#065f46">${ok?'Correct':'Wrong'}</div>`;
+      d.appendChild(row);
+    });
+  }
+  onUser(u=>{
+    const id = qparam("id"); const code = qparam("code") || $("#code").value.trim();
+    if(id) loadById(id); else if(code) loadByCode(code);
+  });
+  $("#load").onclick = ()=>{ const code=$("#code").value.trim().toUpperCase(); if(code) loadByCode(code); };
+</script>
+</body></html>

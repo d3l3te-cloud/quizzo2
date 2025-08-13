@@ -1,0 +1,73 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard • EduConnect</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<header class="header"><div class="container">
+  <strong>EduConnect</strong>
+  <div class="spacer"></div>
+  <nav class="nav">
+    <a href="dashboard.html" data-active="dashboard">Dashboard</a>
+    <a href="create-quiz.html" data-active="create">Create Quiz</a>
+    <a href="leaderboard.html" data-active="leaderboard">Leaderboard</a>
+    <a href="index.html" id="signout">Sign out</a>
+  </nav>
+</div></header>
+<main class="container vstack">
+  <div class="card">
+    <h2>Overview</h2>
+    <div id="meta" class="helper"></div>
+  </div>
+  <div class="hstack">
+    <div class="card" style="flex:1">
+      <h3>Quizzes I created (Teachers)</h3>
+      <table class="table" id="myQuizzes"><thead><tr><th>Title</th><th>Code</th><th>Mode</th><th>Actions</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="card" style="flex:1">
+      <h3>My attempts (Students)</h3>
+      <table class="table" id="myAttempts"><thead><tr><th>Quiz</th><th>Score</th><th>Date</th></tr></thead><tbody></tbody></table>
+      <div class="hstack">
+        <input id="joinCode" class="input" placeholder="Enter quiz code">
+        <button id="joinBtn" class="btn">Start</button>
+      </div>
+    </div>
+  </div>
+</main>
+<script type="module">
+  import { db, onUser, doSignOut } from "./js/auth.js";
+  import { collection, query, where, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+  import { $, guard, fmtDate } from "./js/utils.js";
+  let me=null;
+  onUser(async u=>{
+    me=u; if(!guard(u)) return;
+    $("#meta").textContent = `${u.name||u.email} • ${u.role}`;
+    // My quizzes (teacher)
+    const q1 = query(collection(db,"quizzes"), where("owner","==",u.uid));
+    const snap1 = await getDocs(q1);
+    const tbody1 = document.querySelector("#myQuizzes tbody"); tbody1.innerHTML="";
+    snap1.forEach(d=>{
+      const q=d.data();
+      const tr=document.createElement("tr");
+      tr.innerHTML=`<td>${q.title}</td><td><code class="inline">${q.code||''}</code></td><td>${q.mode||'quiz'}</td>
+        <td><a href="create-quiz.html?id=${d.id}">Edit</a> • <a href="leaderboard.html?id=${d.id}">Leaderboard</a></td>`;
+      tbody1.appendChild(tr);
+    });
+    // My attempts (student)
+    const q2 = query(collection(db,"attempts"), where("userId","==",u.uid));
+    const snap2 = await getDocs(q2);
+    const tbody2 = document.querySelector("#myAttempts tbody"); tbody2.innerHTML="";
+    for (const d of snap2.docs){
+      const a=d.data();
+      const tr=document.createElement("tr");
+      tr.innerHTML=`<td>${a.quizTitle||a.quizId}</td><td>${a.score}/${a.total} (${a.percent}%)</td><td>${fmtDate(a.createdAt)}</td>`;
+      tbody2.appendChild(tr);
+    }
+  });
+  document.getElementById("signout").onclick = async (e)=>{ e.preventDefault(); await doSignOut(); };
+  document.getElementById("joinBtn").onclick = ()=>{
+    const code = $("#joinCode").value.trim().toUpperCase();
+    if(!code) return alert("Enter a code");
+    location.href = `attempt.html?code=${code}`;
+  };
+</script>
+</body></html>

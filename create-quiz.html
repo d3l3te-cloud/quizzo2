@@ -1,0 +1,146 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Create Quiz • EduConnect</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<header class="header"><div class="container">
+  <strong>EduConnect</strong>
+  <div class="spacer"></div>
+  <nav class="nav">
+    <a href="dashboard.html" data-active="dashboard">Dashboard</a>
+    <a href="create-quiz.html" data-active="create">Create Quiz</a>
+  </nav>
+</div></header>
+<main class="container vstack">
+  <div class="card vstack">
+    <div class="hstack"><h2>Create / Edit Quiz</h2><div class="spacer"></div>
+      <button class="btn ghost" onclick="location.href='dashboard.html'">Go to Dashboard</button>
+    </div>
+    <div class="hstack">
+      <div class="vstack" style="flex:2">
+        <label class="label">Title</label><input id="title" class="input">
+        <label class="label">Description</label><textarea id="desc" rows="2"></textarea>
+      </div>
+      <div class="vstack" style="flex:1">
+        <label class="label">Mode</label>
+        <select id="mode"><option value="quiz">Quiz (no time)</option><option value="test">Test (time bounded)</option></select>
+        <label class="label">Time limit (minutes, for Test)</label><input id="timeLimit" type="number" class="input" min="1" placeholder="e.g. 20">
+        <div class="helper">A unique code will be generated on first save.</div>
+      </div>
+    </div>
+    <div id="questions" class="vstack"></div>
+    <div class="hstack">
+      <button id="addQ" class="btn ghost">Add question</button>
+      <button id="saveDraft" class="btn ghost">Save as Draft</button>
+      <button id="publish" class="btn">Create / Update Quiz</button>
+    </div>
+    <div id="share" class="hstack" style="display:none">
+      <div>Share code: <code class="inline" id="code"></code></div>
+      <button id="copyCode" class="btn ghost">Copy</button>
+    </div>
+  </div>
+</main>
+<script type="module">
+  import { db, onUser } from "./js/auth.js";
+  import { collection, addDoc, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+  import { $, guard, genCode, copy } from "./js/utils.js";
+  const id = new URL(location.href).searchParams.get("id");
+  let me=null, quizId=id||null, current={};
+  function qBlock(q={}, idx=0){
+    const wrap=document.createElement("div"); wrap.className="card vstack";
+    wrap.innerHTML = `
+      <div class="hstack"><strong>Q${idx+1}</strong><div class="spacer"></div>
+        <select class="qtype">
+          <option value="single">Single choice</option>
+          <option value="multiple">Multiple choice</option>
+          <option value="numeric">Numerical</option>
+          <option value="short">Short answer</option>
+        </select>
+        <button class="btn ghost remove">Remove</button>
+      </div>
+      <input class="input qtext" placeholder="Question text">
+      <div class="opts vstack"></div>
+      <div class="hstack">
+        <button class="btn ghost addOpt">Add option</button>
+        <div class="helper">For numeric/short, options aren't used.</div>
+      </div>
+      <div class="vstack">
+        <label class="label">Correct answer(s)</label>
+        <input class="input correct" placeholder="For single/multiple: letters like A,B. For numeric: number. For short: text.">
+      </div>
+    `;
+    const sel = wrap.querySelector(".qtype"); sel.value = q.type||"single";
+    const txt = wrap.querySelector(".qtext"); txt.value = q.q||"";
+    const opts = wrap.querySelector(".opts");
+    (q.opts||["",""]).forEach((o,i)=>{
+      const row=document.createElement("div"); row.className="hstack";
+      row.innerHTML = `<span class="badge">${String.fromCharCode(65+i)}</span><input class="input opt" placeholder="Option ${i+1}" value="${o||''}"><button class="btn ghost delOpt">Del</button>`;
+      opts.appendChild(row);
+      row.querySelector(".delOpt").onclick = ()=>{ row.remove(); };
+    });
+    wrap.querySelector(".addOpt").onclick = ()=>{
+      const i=opts.querySelectorAll(".opt").length;
+      const row=document.createElement("div"); row.className="hstack";
+      row.innerHTML = `<span class="badge">${String.fromCharCode(65+i)}</span><input class="input opt" placeholder="Option ${i+1}"><button class="btn ghost delOpt">Del</button>`;
+      opts.appendChild(row);
+      row.querySelector(".delOpt").onclick = ()=>row.remove();
+    };
+    wrap.querySelector(".remove").onclick = ()=> wrap.remove();
+    wrap.querySelector(".correct").value = q.correctDisplay||"";
+    return wrap;
+  }
+  function gather(){
+    const qs = Array.from(document.querySelectorAll("#questions > .card")).map(w=>{
+      const type = w.querySelector(".qtype").value;
+      const q = w.querySelector(".qtext").value.trim();
+      const opts = Array.from(w.querySelectorAll(".opt")).map(i=>i.value.trim()).filter(Boolean);
+      const correctDisplay = w.querySelector(".correct").value.trim();
+      let correct = null;
+      if(type==="single"||type==="multiple"){ correct = correctDisplay.split(",").map(s=>s.trim().toUpperCase()).filter(Boolean); }
+      if(type==="numeric"){ correct = Number(correctDisplay); }
+      if(type==="short"){ correct = correctDisplay; }
+      return { type, q, opts, correct, correctDisplay };
+    }).filter(q=>q.q);
+    return qs;
+  }
+  onUser(async u=>{
+    me=u; if(!guard(u,"teacher")) return;
+    if(quizId){
+      const snap = await getDoc(doc(db,"quizzes",quizId));
+      if(snap.exists()){
+        current = { id: quizId, ...snap.data() };
+        $("#title").value=current.title||""; $("#desc").value=current.desc||""; $("#mode").value=current.mode||"quiz"; $("#timeLimit").value=current.timeLimit||"";
+        (current.questions||[]).forEach((q,i)=>$("#questions").appendChild(qBlock(q,i)));
+        if(current.code){ document.getElementById("share").style.display="flex"; document.getElementById("code").textContent=current.code; }
+      }
+    }
+  });
+  $("#addQ").onclick = ()=>{ const i=$("#questions").children.length; $("#questions").appendChild(qBlock({}, i)); };
+  $("#saveDraft").onclick = async ()=>{
+    if(!me) return;
+    const payload = { title: $("#title").value.trim(), desc: $("#desc").value.trim(), mode: $("#mode").value, timeLimit: Number($("#timeLimit").value)||null, questions: gather(), owner: me.uid, ownerEmail: me.email, draft: true, updatedAt: serverTimestamp() };
+    if(!quizId){ const ref = await addDoc(collection(db,"quizzes"), payload); quizId = ref.id; }
+    else { await setDoc(doc(db,"quizzes",quizId), { ...(current||{}), ...payload }, { merge: true }); }
+    alert("Draft saved");
+  };
+  $("#publish").onclick = async ()=>{
+    if(!me) return;
+    const payload = { title: $("#title").value.trim(), desc: $("#desc").value.trim(), mode: $("#mode").value, timeLimit: Number($("#timeLimit").value)||null, questions: gather(), owner: me.uid, ownerEmail: me.email, draft: false, updatedAt: serverTimestamp() };
+    if(!payload.title || payload.questions.length===0) return alert("Title and at least one question required");
+    if(!quizId){
+      payload.code = genCode();
+      payload.createdAt = serverTimestamp();
+      const ref = await addDoc(collection(db,"quizzes"), payload);
+      quizId = ref.id;
+      document.getElementById("share").style.display="flex";
+      document.getElementById("code").textContent=payload.code;
+    } else {
+      await setDoc(doc(db,"quizzes",quizId), { ...(current||{}), ...payload, code: current.code||genCode(), createdAt: current.createdAt||serverTimestamp() }, { merge: true });
+      document.getElementById("share").style.display="flex";
+      document.getElementById("code").textContent=current.code||"";
+    }
+    alert("Quiz saved");
+  };
+  $("#copyCode").onclick = ()=> copy(document.getElementById("code").textContent).then(()=>alert("Code copied!"));
+</script>
+</body></html>

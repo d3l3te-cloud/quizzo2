@@ -1,0 +1,98 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Attempt • EduConnect</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<header class="header"><div class="container">
+  <strong>EduConnect</strong>
+  <div class="spacer"></div>
+  <nav class="nav">
+    <a href="dashboard.html" data-active="dashboard">Dashboard</a>
+  </nav>
+</div></header>
+<main class="container vstack">
+  <div class="card vstack" id="wrap">
+    <h2 id="title">Attempt Quiz</h2>
+    <div id="meta" class="helper"></div>
+    <form id="form" class="vstack"></form>
+    <div class="hstack">
+      <button id="submit" class="btn">Submit</button>
+      <div id="timer" class="badge" style="display:none"></div>
+    </div>
+    <div id="result" class="vstack"></div>
+  </div>
+</main>
+<script type="module">
+  import { db, onUser } from "./js/auth.js";
+  import { collection, query, where, getDocs, addDoc, doc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+  import { $, qparam } from "./js/utils.js";
+  let me=null, quiz=null, quizId=null, startedAt=null, timeLeft=null, interval=null;
+  function render(quiz){
+    $("#title").textContent = quiz.title;
+    $("#meta").textContent = `${quiz.desc||''} • Mode: ${quiz.mode}${quiz.mode==='test' && quiz.timeLimit? ' • '+quiz.timeLimit+' min' : ''}`;
+    const form = $("#form"); form.innerHTML="";
+    quiz.questions.forEach((q,i)=>{
+      const card=document.createElement("div"); card.className="card vstack";
+      card.innerHTML = `<strong>Q${i+1}. ${q.q}</strong>`;
+      if(q.type==="single"||q.type==="multiple"){
+        q.opts.forEach((opt,idx)=>{
+          const lab=document.createElement("label"); lab.className="hstack";
+          lab.innerHTML=`<input type="${q.type==='single'?'radio':'checkbox'}" name="q${i}" value="${String.fromCharCode(65+idx)}"><span>${opt}</span>`;
+          card.appendChild(lab);
+        });
+      } else if(q.type==="numeric"){
+        card.innerHTML += `<input class="input" name="q${i}" placeholder="Enter number" type="number">`;
+      } else {
+        card.innerHTML += `<input class="input" name="q${i}" placeholder="Your answer">`;
+      }
+      form.appendChild(card);
+    });
+    if(quiz.mode==='test' && quiz.timeLimit){
+      timeLeft = quiz.timeLimit*60;
+      $("#timer").style.display = "inline-block";
+      interval = setInterval(()=>{
+        timeLeft--; const m=Math.floor(timeLeft/60), s=String(timeLeft%60).padStart(2,'0');
+        $("#timer").textContent = `Time left: ${m}:${s}`;
+        if(timeLeft<=0){ clearInterval(interval); submit(); }
+      },1000);
+    }
+  }
+  async function submit(){
+    let score=0;
+    const answers=[];
+    quiz.questions.forEach((q,i)=>{
+      let ans=null;
+      if(q.type==="single"){
+        const sel=document.querySelector(`input[name="q${i}"]:checked`); ans = sel? sel.value : null;
+        if(ans && q.correct?.includes(ans)) score++;
+      } else if(q.type==="multiple"){
+        const sels=[...document.querySelectorAll(`input[name="q${i}"]:checked`)].map(x=>x.value);
+        ans = sels; const corr=(q.correct||[]).sort().join(","), got=sels.sort().join(",");
+        if(corr && corr===got) score++;
+      } else if(q.type==="numeric"){
+        const val=Number(document.querySelector(`input[name="q${i}"]`).value); ans = val;
+        if(Number(val)===Number(q.correct)) score++;
+      } else {
+        const val=document.querySelector(`input[name="q${i}"]`).value.trim(); ans = val;
+        if(String(val).trim().toLowerCase()===String(q.correct||'').trim().toLowerCase()) score++;
+      }
+      answers.push(ans);
+    });
+    const total=quiz.questions.length, percent=Math.round((score/total)*100);
+    $("#result").innerHTML = `<div class="card"><strong>Score: ${score}/${total} (${percent}%)</strong></div>`;
+    if(interval) clearInterval(interval);
+    if(me){
+      await addDoc(collection(db,"attempts"), { quizId, quizTitle: quiz.title, userId: me.uid, userEmail: me.email, score, total, percent, answers, createdAt: serverTimestamp() });
+    }
+  }
+  document.getElementById("submit").onclick = (e)=>{ e.preventDefault(); submit(); };
+  onUser(async u=>{
+    me=u; // students & teachers can attempt
+    const code = qparam("code");
+    if(!code) return alert("Missing code");
+    const qs = await getDocs(query(collection(db,"quizzes"), where("code","==",code)));
+    if(qs.empty){ alert("Invalid code"); return; }
+    const d = qs.docs[0]; quiz = d.data(); quizId = d.id; render(quiz);
+  });
+</script>
+</body></html>

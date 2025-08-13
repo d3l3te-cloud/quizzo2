@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isTeacher(uid) { return get(/databases/$(database)/documents/users/$(uid)).data.role == 'teacher'; }
+
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if request.auth!=null && request.auth.uid==uid;
+      allow update: if request.auth!=null && request.auth.uid==uid;
+    }
+
+    match /quizzes/{id} {
+      allow read: if true;
+      allow create: if isSignedIn() && isTeacher(request.auth.uid);
+      allow update, delete: if isSignedIn() && isTeacher(request.auth.uid) && resource.data.owner == request.auth.uid;
+    }
+
+    match /attempts/{id} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn(); // tighten to teachers or owner later
+    }
+
+    match /messages/{id} {
+      allow read, create: if isSignedIn();
+    }
+  }
+}

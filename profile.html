@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Profile • EduConnect</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<header class="header"><div class="container">
+  <strong>EduConnect</strong>
+  <div class="spacer"></div>
+  <nav class="nav">
+    <a href="dashboard.html" data-active="dashboard">Dashboard</a>
+  </nav>
+</div></header>
+<main class="container">
+  <div class="card vstack">
+    <h2>Complete your profile</h2>
+    <div class="hstack">
+      <div style="width:48%">
+        <label class="label">Name</label><input id="name" class="input">
+        <label class="label">Gender</label>
+        <select id="gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select>
+        <label class="label">Profession</label>
+        <select id="role"><option value="student">Student</option><option value="teacher">Teacher</option></select>
+        <button id="save" class="btn" style="margin-top:10px">Save & Continue</button>
+      </div>
+      <div class="vstack" style="width:48%">
+        <div class="helper">Your role controls permissions. You can change it later.</div>
+      </div>
+    </div>
+  </div>
+</main>
+<script type="module">
+  import { db, onUser } from "./js/auth.js";
+  import { doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js";
+  import { $, guard } from "./js/utils.js";
+  let me=null;
+  onUser(u=>{ me=u; if(!guard(u)) return; $("#name").value=u?.name||''; $("#gender").value=u?.gender||''; $("#role").value=u?.role||'student'; });
+  $("#save").onclick = async ()=>{
+    if(!me) return;
+    const ref = doc(db,"users",me.uid);
+    await updateDoc(ref,{ name: $("#name").value.trim(), gender: $("#gender").value, role: $("#role").value, updatedAt: serverTimestamp() });
+    location.href="dashboard.html";
+  };
+</script>
+</body></html>

@@ -1,0 +1,43 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EduConnect • Login</title>
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<header class="header"><div class="container">
+  <strong>EduConnect</strong>
+  <div class="spacer"></div>
+  <nav class="nav">
+    <a href="index.html" data-active="login">Login</a>
+    <a href="dashboard.html" data-active="dashboard">Dashboard</a>
+  </nav>
+</div></header>
+<main class="container">
+  <div class="card vstack">
+    <h2>Welcome back</h2>
+    <div class="hstack">
+      <div class="vstack" style="flex:1">
+        <label class="label">Email</label><input id="email" class="input" type="email" placeholder="you@example.com">
+        <label class="label">Password</label><input id="password" class="input" type="password" placeholder="••••••••">
+        <div class="hstack">
+          <button id="signin" class="btn">Sign in</button>
+          <button id="signup" class="btn ghost">Create account</button>
+        </div>
+      </div>
+      <div class="vstack" style="flex:1">
+        <div class="helper">Or</div>
+        <button id="google" class="btn">Continue with Google</button>
+        <div class="helper">New users will be asked to complete profile.</div>
+      </div>
+    </div>
+  </div>
+</main>
+<script type="module">
+  import { mountHeader, doEmailSignIn, doEmailSignUp, doGoogle, onUser } from "./js/auth.js";
+  import { $ } from "./js/utils.js";
+  mountHeader("login");
+  onUser(u=>{ if(u) location.href = "dashboard.html"; });
+  $("#signin").onclick = async ()=>{ const e=$("#email").value.trim(), p=$("#password").value.trim(); if(!e||!p) return alert("Enter email & password"); try{ await doEmailSignIn(e,p); }catch(err){ alert(err.message); } };
+  $("#signup").onclick = async ()=>{ const e=$("#email").value.trim(), p=$("#password").value.trim(); if(!e||!p) return alert("Enter email & password"); try{ await doEmailSignUp(e,p); location.href="profile.html"; }catch(err){ alert(err.message); } };
+  $("#google").onclick = async ()=>{ try{ await doGoogle(); location.href="profile.html"; }catch(err){ alert(err.message); } };
+</script>
+</body></html>
