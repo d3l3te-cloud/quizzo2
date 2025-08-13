@@ -1,0 +1,7 @@
+/* Custom CSS can be added here to extend Tailwind's utility classes */
+.quiz-card {
+    transition: transform 0.2s ease-in-out;
+}
+.quiz-card:hover {
+    transform: translateY(-5px);
+}
