@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz App</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS file -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Firebase CDN Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // This is a global function to be used in app.js
+        window.firebaseDependencies = { initializeApp, getAuth, onAuthStateChanged, signInWithCustomToken, signInAnonymously, getFirestore, collection, query, onSnapshot, orderBy };
+    </script>
+</head>
+<body class="bg-gray-100 font-inter">
+    <header class="bg-white shadow-sm p-4">
+        <nav class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-gray-800">Quiz App</h1>
+            <div id="auth-controls" class="space-x-4">
+                <!-- Buttons for authenticated and unauthenticated users will be injected here -->
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mx-auto mt-8 p-4">
+        <h2 class="text-3xl font-bold text-gray-800 mb-6">Available Quizzes</h2>
+        <div id="quizzes-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Quizzes will be dynamically added here -->
+            <p id="loading-quizzes" class="text-gray-500 text-center col-span-full">Loading quizzes...</p>
+        </div>
+    </main>
+
+    <div id="modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full text-center">
+            <p id="modal-message" class="text-lg text-gray-800 mb-4"></p>
+            <button id="modal-close" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors">Close</button>
+        </div>
+    </div>
+
+    <!-- Custom JavaScript file -->
+    <script src="app.js" type="module"></script>
+</body>
+</html>
